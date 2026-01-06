@@ -4,6 +4,7 @@ const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const connectDb = require("./config/db");
+const User = require("./models/User");
 const authRoutes = require("./routes/auth");
 const usersRoutes = require("./routes/users");
 
@@ -30,6 +31,13 @@ app.use("/api/users", usersRoutes);
 const start = async () => {
   try {
     await connectDb();
+    try {
+      await User.collection.dropIndex("firebaseUid_1");
+    } catch (error) {
+      if (!String(error?.message || "").includes("index not found")) {
+        console.warn("Index cleanup skipped:", error.message);
+      }
+    }
     if (!process.env.JWT_SECRET) {
       throw new Error("JWT_SECRET is required");
     }
