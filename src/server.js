@@ -5,7 +5,9 @@ const cors = require("cors");
 const morgan = require("morgan");
 const connectDb = require("./config/db");
 const User = require("./models/User");
+const adminRoutes = require("./routes/admin");
 const authRoutes = require("./routes/auth");
+const productsRoutes = require("./routes/products");
 const usersRoutes = require("./routes/users");
 
 const app = express();
@@ -25,7 +27,9 @@ app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 
+app.use("/api/admin", adminRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/products", productsRoutes);
 app.use("/api/users", usersRoutes);
 
 const start = async () => {
