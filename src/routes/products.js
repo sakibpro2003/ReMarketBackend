@@ -68,6 +68,74 @@ router.post("/", requireAuth, async (req, res) => {
   }
 });
 
+router.get("/", async (req, res) => {
+  try {
+    const {
+      search,
+      category,
+      condition,
+      minPrice,
+      maxPrice,
+      sort
+    } = req.query;
+
+    const query = { status: "approved" };
+
+    if (category && category !== "all") {
+      query.category = category;
+    }
+
+    if (condition && condition !== "all") {
+      query.condition = condition;
+    }
+
+    const priceFilter = {};
+    if (minPrice !== undefined && minPrice !== "") {
+      const min = Number(minPrice);
+      if (!Number.isNaN(min)) {
+        priceFilter.$gte = min;
+      }
+    }
+    if (maxPrice !== undefined && maxPrice !== "") {
+      const max = Number(maxPrice);
+      if (!Number.isNaN(max)) {
+        priceFilter.$lte = max;
+      }
+    }
+    if (Object.keys(priceFilter).length) {
+      query.price = priceFilter;
+    }
+
+    if (search && search.trim().length) {
+      const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const regex = new RegExp(escaped, "i");
+      query.$or = [
+        { title: regex },
+        { description: regex },
+        { category: regex },
+        { tags: regex },
+        { "attributes.key": regex },
+        { "attributes.value": regex }
+      ];
+    }
+
+    let sortBy = { createdAt: -1 };
+    if (sort === "price_asc") {
+      sortBy = { price: 1 };
+    } else if (sort === "price_desc") {
+      sortBy = { price: -1 };
+    } else if (sort === "oldest") {
+      sortBy = { createdAt: 1 };
+    }
+
+    const products = await Product.find(query).sort(sortBy).lean();
+    return res.json({ products, count: products.length });
+  } catch (error) {
+    console.error("Load products failed", error);
+    return res.status(500).json({ error: "Failed to load products" });
+  }
+});
+
 router.get("/mine", requireAuth, async (req, res) => {
   try {
     const products = await Product.find({ seller: req.userId })

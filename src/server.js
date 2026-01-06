@@ -8,6 +8,7 @@ const User = require("./models/User");
 const adminRoutes = require("./routes/admin");
 const authRoutes = require("./routes/auth");
 const productsRoutes = require("./routes/products");
+const uploadsRoutes = require("./routes/uploads");
 const usersRoutes = require("./routes/users");
 
 const app = express();
@@ -30,6 +31,7 @@ app.get("/health", (req, res) => {
 app.use("/api/admin", adminRoutes);
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productsRoutes);
+app.use("/api/uploads", uploadsRoutes);
 app.use("/api/users", usersRoutes);
 
 const start = async () => {
