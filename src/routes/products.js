@@ -149,4 +149,24 @@ router.get("/mine", requireAuth, async (req, res) => {
   }
 });
 
+router.get("/:id", async (req, res) => {
+  try {
+    const product = await Product.findOne({
+      _id: req.params.id,
+      status: "approved"
+    })
+      .populate("seller", "firstName lastName")
+      .lean();
+
+    if (!product) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
+    return res.json({ product });
+  } catch (error) {
+    console.error("Load product failed", error);
+    return res.status(500).json({ error: "Failed to load product" });
+  }
+});
+
 module.exports = router;

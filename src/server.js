@@ -10,6 +10,7 @@ const authRoutes = require("./routes/auth");
 const productsRoutes = require("./routes/products");
 const uploadsRoutes = require("./routes/uploads");
 const usersRoutes = require("./routes/users");
+const wishlistRoutes = require("./routes/wishlist");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -33,6 +34,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/products", productsRoutes);
 app.use("/api/uploads", uploadsRoutes);
 app.use("/api/users", usersRoutes);
+app.use("/api/wishlist", wishlistRoutes);
 
 const start = async () => {
   try {
