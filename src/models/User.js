@@ -10,6 +10,8 @@ const userSchema = new mongoose.Schema(
     address: { type: String, required: true, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ["user", "admin"], default: "user" },
+    blocked: { type: Boolean, default: false },
+    frozenUntil: { type: Date, default: null },
     lastLoginAt: { type: Date }
   },
   { timestamps: true }

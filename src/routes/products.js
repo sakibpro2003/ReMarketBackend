@@ -1,6 +1,7 @@
 const express = require("express");
 const { z } = require("zod");
 const requireAuth = require("../middleware/requireAuth");
+const requireActiveUser = require("../middleware/requireActiveUser");
 const Product = require("../models/Product");
 const Notification = require("../models/Notification");
 
@@ -38,7 +39,7 @@ const productSchema = z.object({
 
 const firstZodError = (error) => error.errors?.[0]?.message || "Invalid data";
 
-router.post("/", requireAuth, async (req, res) => {
+router.post("/", requireAuth, requireActiveUser, async (req, res) => {
   try {
     const parsed = productSchema.safeParse(req.body);
     if (!parsed.success) {

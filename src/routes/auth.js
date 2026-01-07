@@ -115,6 +115,12 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ error: "Invalid email or password" });
     }
 
+    if (user.blocked) {
+      return res
+        .status(403)
+        .json({ error: "Your account is blocked. Contact support." });
+    }
+
     const match = await bcrypt.compare(password, user.passwordHash);
     if (!match) {
       return res.status(401).json({ error: "Invalid email or password" });

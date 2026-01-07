@@ -1,6 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const requireAuth = require("../middleware/requireAuth");
+const requireActiveUser = require("../middleware/requireActiveUser");
 const Product = require("../models/Product");
 const WishlistItem = require("../models/WishlistItem");
 
@@ -23,7 +24,7 @@ router.get("/", requireAuth, async (req, res) => {
   }
 });
 
-router.post("/:productId", requireAuth, async (req, res) => {
+router.post("/:productId", requireAuth, requireActiveUser, async (req, res) => {
   const { productId } = req.params;
 
   if (!isValidObjectId(productId)) {
@@ -71,28 +72,33 @@ router.post("/:productId", requireAuth, async (req, res) => {
   }
 });
 
-router.delete("/:productId", requireAuth, async (req, res) => {
-  const { productId } = req.params;
+router.delete(
+  "/:productId",
+  requireAuth,
+  requireActiveUser,
+  async (req, res) => {
+    const { productId } = req.params;
 
-  if (!isValidObjectId(productId)) {
-    return res.status(400).json({ error: "Invalid product id" });
-  }
-
-  try {
-    const removed = await WishlistItem.findOneAndDelete({
-      user: req.userId,
-      product: productId
-    });
-
-    if (!removed) {
-      return res.status(404).json({ error: "Wishlist item not found" });
+    if (!isValidObjectId(productId)) {
+      return res.status(400).json({ error: "Invalid product id" });
     }
 
-    return res.json({ removed: true });
-  } catch (error) {
-    console.error("Remove wishlist failed", error);
-    return res.status(500).json({ error: "Failed to update wishlist" });
+    try {
+      const removed = await WishlistItem.findOneAndDelete({
+        user: req.userId,
+        product: productId
+      });
+
+      if (!removed) {
+        return res.status(404).json({ error: "Wishlist item not found" });
+      }
+
+      return res.json({ removed: true });
+    } catch (error) {
+      console.error("Remove wishlist failed", error);
+      return res.status(500).json({ error: "Failed to update wishlist" });
+    }
   }
-});
+);
 
 module.exports = router;
