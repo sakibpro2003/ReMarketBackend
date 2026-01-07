@@ -27,7 +27,7 @@ const productSchema = new mongoose.Schema(
     },
     price: { type: Number, required: true, min: 0 },
     negotiable: { type: Boolean, default: false },
-    quantity: { type: Number, default: 1, min: 1 },
+    quantity: { type: Number, default: 1, min: 0 },
     location: { type: String, required: true, trim: true },
     description: { type: String, required: true, trim: true },
     tags: { type: [String], default: [] },

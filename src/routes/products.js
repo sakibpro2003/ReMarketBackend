@@ -2,6 +2,7 @@ const express = require("express");
 const { z } = require("zod");
 const requireAuth = require("../middleware/requireAuth");
 const requireActiveUser = require("../middleware/requireActiveUser");
+const { getCommissionRate } = require("../config/commission");
 const Product = require("../models/Product");
 const Notification = require("../models/Notification");
 
@@ -82,7 +83,7 @@ router.get("/", async (req, res) => {
       limit
     } = req.query;
 
-    const query = { status: "approved" };
+    const query = { status: "approved", quantity: { $gt: 0 } };
     const currentPage = Math.max(Number.parseInt(page, 10) || 1, 1);
     const pageSize = Math.min(
       Math.max(Number.parseInt(limit, 10) || 9, 1),
@@ -172,16 +173,18 @@ router.get("/:id", async (req, res) => {
   try {
     const product = await Product.findOne({
       _id: req.params.id,
-      status: "approved"
+      status: "approved",
+      quantity: { $gt: 0 }
     })
-      .populate("seller", "firstName lastName")
+      .populate("seller", "firstName lastName email phone")
       .lean();
 
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }
 
-    return res.json({ product });
+    const commissionRate = getCommissionRate();
+    return res.json({ product, commissionRate });
   } catch (error) {
     console.error("Load product failed", error);
     return res.status(500).json({ error: "Failed to load product" });

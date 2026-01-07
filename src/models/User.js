@@ -8,6 +8,7 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, required: true, trim: true },
     gender: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },
+    avatarUrl: { type: String, trim: true },
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ["user", "admin"], default: "user" },
     blocked: { type: Boolean, default: false },

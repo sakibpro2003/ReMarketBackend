@@ -3,6 +3,7 @@ const { z } = require("zod");
 const requireAuth = require("../middleware/requireAuth");
 const requireAdmin = require("../middleware/requireAdmin");
 const Notification = require("../models/Notification");
+const Order = require("../models/Order");
 const Product = require("../models/Product");
 const User = require("../models/User");
 
@@ -48,8 +49,12 @@ const freezeSchema = z
 
 router.get("/notifications", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const unreadCount = await Notification.countDocuments({ isRead: false });
-    const notifications = await Notification.find({})
+    const filter = { type: "listing_submitted" };
+    const unreadCount = await Notification.countDocuments({
+      ...filter,
+      isRead: false
+    });
+    const notifications = await Notification.find(filter)
       .sort({ createdAt: -1 })
       .limit(5)
       .populate("seller", "firstName lastName");
@@ -69,6 +74,55 @@ router.get("/notifications", requireAuth, requireAdmin, async (req, res) => {
   } catch (error) {
     console.error("Load notifications failed", error);
     return res.status(500).json({ error: "Failed to load notifications" });
+  }
+});
+
+router.get("/transactions", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const summaryData = await Order.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          totalSales: { $sum: "$price" },
+          totalCommission: { $sum: "$commissionAmount" },
+          totalGross: { $sum: "$totalAmount" }
+        }
+      }
+    ]);
+
+    const summary = summaryData[0] || {
+      totalOrders: 0,
+      totalSales: 0,
+      totalCommission: 0,
+      totalGross: 0
+    };
+
+    const transactions = await Order.find({})
+      .sort({ createdAt: -1 })
+      .limit(8)
+      .populate("product", "title")
+      .populate("seller", "firstName lastName")
+      .lean();
+
+    return res.json({
+      summary,
+      transactions: transactions.map((order) => ({
+        id: order._id.toString(),
+        productTitle: order.product?.title || "Unknown item",
+        sellerName: order.seller
+          ? `${order.seller.firstName} ${order.seller.lastName}`
+          : "Unknown",
+        buyerName: order.delivery?.name || "Buyer",
+        price: order.price,
+        commissionAmount: order.commissionAmount,
+        totalAmount: order.totalAmount,
+        createdAt: order.createdAt
+      }))
+    });
+  } catch (error) {
+    console.error("Load transactions failed", error);
+    return res.status(500).json({ error: "Failed to load transactions" });
   }
 });
 
