@@ -35,17 +35,30 @@ router.get("/notifications", requireAuth, requireAdmin, async (req, res) => {
 router.get("/listings", requireAuth, requireAdmin, async (req, res) => {
   try {
     const status = req.query.status;
+    const page = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(
+      Math.max(Number.parseInt(req.query.limit, 10) || 8, 1),
+      50
+    );
     const filter = {};
     if (status && status !== "all") {
       filter.status = status;
     }
 
+    const total = await Product.countDocuments(filter);
     const products = await Product.find(filter)
       .populate("seller", "firstName lastName email phone")
       .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
       .lean();
 
-    return res.json({ products });
+    return res.json({
+      products,
+      total,
+      page,
+      pageSize: limit
+    });
   } catch (error) {
     console.error("Load admin listings failed", error);
     return res.status(500).json({ error: "Failed to load listings" });

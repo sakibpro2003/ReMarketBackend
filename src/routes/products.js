@@ -76,10 +76,17 @@ router.get("/", async (req, res) => {
       condition,
       minPrice,
       maxPrice,
-      sort
+      sort,
+      page,
+      limit
     } = req.query;
 
     const query = { status: "approved" };
+    const currentPage = Math.max(Number.parseInt(page, 10) || 1, 1);
+    const pageSize = Math.min(
+      Math.max(Number.parseInt(limit, 10) || 9, 1),
+      50
+    );
 
     if (category && category !== "all") {
       query.category = category;
@@ -128,8 +135,19 @@ router.get("/", async (req, res) => {
       sortBy = { createdAt: 1 };
     }
 
-    const products = await Product.find(query).sort(sortBy).lean();
-    return res.json({ products, count: products.length });
+    const total = await Product.countDocuments(query);
+    const products = await Product.find(query)
+      .sort(sortBy)
+      .skip((currentPage - 1) * pageSize)
+      .limit(pageSize)
+      .lean();
+    return res.json({
+      products,
+      count: products.length,
+      total,
+      page: currentPage,
+      pageSize
+    });
   } catch (error) {
     console.error("Load products failed", error);
     return res.status(500).json({ error: "Failed to load products" });
