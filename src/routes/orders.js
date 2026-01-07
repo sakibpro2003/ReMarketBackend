@@ -38,8 +38,14 @@ const orderSchema = z
       email: z.string().trim().email("Email must be valid"),
       phone: z.string().trim().min(1, "Phone is required"),
       address: z.string().trim().min(1, "Address is required"),
-      city: z.string().trim().min(1, "City is required"),
-      postalCode: z.string().trim().min(1, "Postal code is required"),
+      city: z.preprocess(
+        emptyToUndefined,
+        z.string().trim().min(1, "City is required").optional()
+      ),
+      postalCode: z.preprocess(
+        emptyToUndefined,
+        z.string().trim().min(1, "Postal code is required").optional()
+      ),
       professionalWebsite: z.preprocess(
         emptyToUndefined,
         z.string().trim().url("Professional website must be a valid URL").optional()

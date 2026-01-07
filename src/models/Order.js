@@ -6,8 +6,8 @@ const deliverySchema = new mongoose.Schema(
     email: { type: String, required: true, trim: true },
     phone: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },
-    city: { type: String, required: true, trim: true },
-    postalCode: { type: String, required: true, trim: true },
+    city: { type: String, trim: true },
+    postalCode: { type: String, trim: true },
     professionalWebsite: { type: String, trim: true },
     additionalDetails: { type: String, trim: true }
   },

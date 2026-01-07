@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const { z } = require("zod");
 const requireAuth = require("../middleware/requireAuth");
 const requireAdmin = require("../middleware/requireAdmin");
@@ -44,6 +45,12 @@ const firstZodError = (error) => error.errors?.[0]?.message || "Invalid data";
 const freezeSchema = z
   .object({
     days: z.number().int().min(1).max(365)
+  })
+  .strict();
+
+const assignSellerSchema = z
+  .object({
+    sellerId: z.string().trim().min(1)
   })
   .strict();
 
@@ -283,6 +290,115 @@ router.get("/listings", requireAuth, requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Failed to load listings" });
   }
 });
+
+router.get("/orphan-listings", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const page = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(
+      Math.max(Number.parseInt(req.query.limit, 10) || 8, 1),
+      50
+    );
+
+    const [result] = await Product.aggregate([
+      {
+        $lookup: {
+          from: "users",
+          localField: "seller",
+          foreignField: "_id",
+          as: "sellerInfo"
+        }
+      },
+      {
+        $match: {
+          $expr: { $eq: [{ $size: "$sellerInfo" }, 0] }
+        }
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $facet: {
+          items: [
+            { $skip: (page - 1) * limit },
+            { $limit: limit },
+            { $project: { sellerInfo: 0 } }
+          ],
+          total: [{ $count: "count" }]
+        }
+      }
+    ]);
+
+    const products = result?.items || [];
+    const total = result?.total?.[0]?.count || 0;
+
+    return res.json({
+      products,
+      total,
+      page,
+      pageSize: limit
+    });
+  } catch (error) {
+    console.error("Load orphan listings failed", error);
+    return res.status(500).json({ error: "Failed to load orphan listings" });
+  }
+});
+
+router.patch(
+  "/orphan-listings/assign-seller",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const parsed = assignSellerSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: firstZodError(parsed.error) });
+      }
+
+      const { sellerId } = parsed.data;
+      if (!mongoose.Types.ObjectId.isValid(sellerId)) {
+        return res.status(400).json({ error: "Seller id is invalid" });
+      }
+
+      const seller = await User.findById(sellerId).select("_id");
+      if (!seller) {
+        return res.status(404).json({ error: "Seller not found" });
+      }
+
+      const orphanIds = await Product.aggregate([
+        {
+          $lookup: {
+            from: "users",
+            localField: "seller",
+            foreignField: "_id",
+            as: "sellerInfo"
+          }
+        },
+        {
+          $match: {
+            $expr: { $eq: [{ $size: "$sellerInfo" }, 0] }
+          }
+        },
+        { $project: { _id: 1 } }
+      ]);
+
+      const ids = orphanIds.map((item) => item._id);
+      if (!ids.length) {
+        return res.json({ updatedCount: 0, totalOrphans: 0 });
+      }
+
+      const result = await Product.updateMany(
+        { _id: { $in: ids } },
+        { $set: { seller: seller._id } }
+      );
+
+      return res.json({
+        updatedCount: result.modifiedCount || 0,
+        totalOrphans: ids.length
+      });
+    } catch (error) {
+      console.error("Assign seller to orphans failed", error);
+      return res.status(500).json({ error: "Failed to assign seller" });
+    }
+  }
+);
 
 router.get("/listings/:id", requireAuth, requireAdmin, async (req, res) => {
   try {
