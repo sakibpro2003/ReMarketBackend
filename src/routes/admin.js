@@ -7,6 +7,12 @@ const Notification = require("../models/Notification");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const User = require("../models/User");
+const CommissionHistory = require("../models/CommissionHistory");
+const {
+  getCommissionRate,
+  normalizeCommissionRate,
+  setCommissionRate
+} = require("../config/commission");
 
 const router = express.Router();
 
@@ -51,6 +57,12 @@ const freezeSchema = z
 const assignSellerSchema = z
   .object({
     sellerId: z.string().trim().min(1)
+  })
+  .strict();
+
+const commissionSchema = z
+  .object({
+    rate: z.number().min(0)
   })
   .strict();
 
@@ -130,6 +142,77 @@ router.get("/transactions", requireAuth, requireAdmin, async (req, res) => {
   } catch (error) {
     console.error("Load transactions failed", error);
     return res.status(500).json({ error: "Failed to load transactions" });
+  }
+});
+
+router.get("/commission", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const history = await CommissionHistory.find({})
+      .sort({ createdAt: -1 })
+      .limit(12)
+      .populate("createdBy", "firstName lastName email")
+      .lean();
+
+    return res.json({
+      rate: getCommissionRate(),
+      history: history.map((item) => ({
+        id: item._id.toString(),
+        rate: item.rate,
+        createdAt: item.createdAt,
+        createdBy: item.createdBy
+          ? {
+              id: item.createdBy._id.toString(),
+              name: `${item.createdBy.firstName} ${item.createdBy.lastName}`,
+              email: item.createdBy.email
+            }
+          : null
+      }))
+    });
+  } catch (error) {
+    console.error("Load commission history failed", error);
+    return res.status(500).json({ error: "Failed to load commission history" });
+  }
+});
+
+router.patch("/commission", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const parsed = commissionSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: firstZodError(parsed.error) });
+    }
+
+    const normalized = normalizeCommissionRate(parsed.data.rate);
+    if (normalized === null) {
+      return res.status(400).json({ error: "Commission rate is invalid" });
+    }
+
+    const created = await CommissionHistory.create({
+      rate: normalized,
+      createdBy: req.userId
+    });
+    const populated = await created.populate(
+      "createdBy",
+      "firstName lastName email"
+    );
+
+    return res.json({
+      rate: setCommissionRate(normalized),
+      historyItem: {
+        id: populated._id.toString(),
+        rate: populated.rate,
+        createdAt: populated.createdAt,
+        createdBy: populated.createdBy
+          ? {
+              id: populated.createdBy._id.toString(),
+              name: `${populated.createdBy.firstName} ${populated.createdBy.lastName}`,
+              email: populated.createdBy.email
+            }
+          : null
+      }
+    });
+  } catch (error) {
+    console.error("Update commission rate failed", error);
+    return res.status(500).json({ error: "Failed to update commission rate" });
   }
 });
 

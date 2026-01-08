@@ -12,6 +12,7 @@ const ordersRoutes = require("./routes/orders");
 const uploadsRoutes = require("./routes/uploads");
 const usersRoutes = require("./routes/users");
 const wishlistRoutes = require("./routes/wishlist");
+const { hydrateCommissionRate } = require("./config/commission");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -41,6 +42,11 @@ app.use("/api/wishlist", wishlistRoutes);
 const start = async () => {
   try {
     await connectDb();
+    try {
+      await hydrateCommissionRate();
+    } catch (error) {
+      console.warn("Commission rate preload skipped:", error.message);
+    }
     try {
       await User.collection.dropIndex("firebaseUid_1");
     } catch (error) {
