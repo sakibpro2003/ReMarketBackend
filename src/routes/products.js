@@ -38,6 +38,35 @@ const productSchema = z.object({
   status: z.enum(["draft", "pending"]).optional()
 });
 
+const listingUpdateSchema = z
+  .object({
+    title: z.string().trim().min(1).optional(),
+    category: z.string().trim().min(1).optional(),
+    condition: z.enum(["new", "like_new", "good", "fair"]).optional(),
+    price: z.number().nonnegative().optional(),
+    negotiable: z.boolean().optional(),
+    quantity: z.number().int().positive().optional(),
+    location: z.string().trim().min(1).optional(),
+    description: z.string().trim().min(1).optional(),
+    tags: z.array(z.string().trim()).optional(),
+    attributes: z
+      .array(
+        z.object({
+          key: z.string().trim().min(1),
+          value: z.string().trim().min(1)
+        })
+      )
+      .optional(),
+    images: z
+      .array(
+        z.object({
+          url: z.string().trim().url("Image URL must be valid")
+        })
+      )
+      .optional()
+  })
+  .strict();
+
 const firstZodError = (error) => error.errors?.[0]?.message || "Invalid data";
 
 router.post("/", requireAuth, requireActiveUser, async (req, res) => {
@@ -166,6 +195,35 @@ router.get("/mine", requireAuth, async (req, res) => {
   } catch (error) {
     console.error("Load user products failed", error);
     return res.status(500).json({ error: "Failed to load products" });
+  }
+});
+
+router.patch("/:id", requireAuth, requireActiveUser, async (req, res) => {
+  try {
+    const parsed = listingUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: firstZodError(parsed.error) });
+    }
+
+    const updates = parsed.data;
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ error: "No updates provided" });
+    }
+
+    const product = await Product.findOneAndUpdate(
+      { _id: req.params.id, seller: req.userId },
+      { $set: updates },
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!product) {
+      return res.status(404).json({ error: "Listing not found" });
+    }
+
+    return res.json({ product });
+  } catch (error) {
+    console.error("Update listing failed", error);
+    return res.status(500).json({ error: "Failed to update listing" });
   }
 });
 
