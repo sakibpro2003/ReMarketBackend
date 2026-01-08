@@ -13,6 +13,9 @@ const uploadsRoutes = require("./routes/uploads");
 const usersRoutes = require("./routes/users");
 const wishlistRoutes = require("./routes/wishlist");
 const reviewsRoutes = require("./routes/reviews");
+const complaintsRoutes = require("./routes/complaints");
+const blogsRoutes = require("./routes/blogs");
+const adminBlogsRoutes = require("./routes/adminBlogs");
 const { hydrateCommissionRate } = require("./config/commission");
 
 const app = express();
@@ -40,6 +43,9 @@ app.use("/api/uploads", uploadsRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/wishlist", wishlistRoutes);
 app.use("/api/reviews", reviewsRoutes);
+app.use("/api/complaints", complaintsRoutes);
+app.use("/api/blogs", blogsRoutes);
+app.use("/api/admin/blogs", adminBlogsRoutes);
 
 const start = async () => {
   try {

@@ -7,6 +7,7 @@ const Notification = require("../models/Notification");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
 const User = require("../models/User");
+const Complaint = require("../models/Complaint");
 const CommissionHistory = require("../models/CommissionHistory");
 const {
   getCommissionRate,
@@ -66,9 +67,16 @@ const commissionSchema = z
   })
   .strict();
 
+const complaintReplySchema = z
+  .object({
+    reply: z.string().trim().min(3),
+    status: z.enum(["replied", "closed"]).optional()
+  })
+  .strict();
+
 router.get("/notifications", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const filter = { type: "listing_submitted" };
+    const filter = { type: { $in: ["listing_submitted", "blog_submitted"] } };
     const unreadCount = await Notification.countDocuments({
       ...filter,
       isRead: false
@@ -85,9 +93,11 @@ router.get("/notifications", requireAuth, requireAdmin, async (req, res) => {
         message: item.message,
         isRead: item.isRead,
         createdAt: item.createdAt,
-        sellerName: item.seller
+        submitterName: item.seller
           ? `${item.seller.firstName} ${item.seller.lastName}`
-          : "Unknown"
+          : "Unknown",
+        submitterLabel: item.type === "blog_submitted" ? "Author" : "Seller",
+        sourceType: item.type === "blog_submitted" ? "blog" : "listing"
       }))
     });
   } catch (error) {
@@ -173,6 +183,99 @@ router.get("/commission", requireAuth, requireAdmin, async (req, res) => {
     return res.status(500).json({ error: "Failed to load commission history" });
   }
 });
+
+router.get("/complaints", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const complaints = await Complaint.find({})
+      .sort({ createdAt: -1 })
+      .populate("user", "firstName lastName email")
+      .populate("product", "title")
+      .populate("adminReply.repliedBy", "firstName lastName email")
+      .lean();
+
+    return res.json({
+      complaints: complaints.map((complaint) => ({
+        id: complaint._id.toString(),
+        subject: complaint.subject,
+        message: complaint.message,
+        imageUrl: complaint.imageUrl,
+        status: complaint.status,
+        createdAt: complaint.createdAt,
+        updatedAt: complaint.updatedAt,
+        user: complaint.user
+          ? {
+              id: complaint.user._id.toString(),
+              name: `${complaint.user.firstName} ${complaint.user.lastName}`,
+              email: complaint.user.email
+            }
+          : null,
+        product: complaint.product
+          ? {
+              id: complaint.product._id.toString(),
+              title: complaint.product.title
+            }
+          : null,
+        adminReply: complaint.adminReply?.message
+          ? {
+              message: complaint.adminReply.message,
+              repliedAt: complaint.adminReply.repliedAt,
+              repliedBy: complaint.adminReply.repliedBy
+                ? {
+                    id: complaint.adminReply.repliedBy._id.toString(),
+                    name: `${complaint.adminReply.repliedBy.firstName} ${complaint.adminReply.repliedBy.lastName}`,
+                    email: complaint.adminReply.repliedBy.email
+                  }
+                : null
+            }
+          : null
+      }))
+    });
+  } catch (error) {
+    console.error("Load complaints failed", error);
+    return res.status(500).json({ error: "Failed to load complaints" });
+  }
+});
+
+router.patch(
+  "/complaints/:id/reply",
+  requireAuth,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const parsed = complaintReplySchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ error: firstZodError(parsed.error) });
+      }
+
+      const complaint = await Complaint.findById(req.params.id);
+      if (!complaint) {
+        return res.status(404).json({ error: "Complaint not found" });
+      }
+
+      complaint.adminReply = {
+        message: parsed.data.reply,
+        repliedBy: req.userId,
+        repliedAt: new Date()
+      };
+      complaint.status = parsed.data.status || "replied";
+      await complaint.save();
+
+      return res.json({
+        complaint: {
+          id: complaint._id.toString(),
+          status: complaint.status,
+          adminReply: {
+            message: complaint.adminReply.message,
+            repliedAt: complaint.adminReply.repliedAt
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Reply to complaint failed", error);
+      return res.status(500).json({ error: "Failed to reply to complaint" });
+    }
+  }
+);
 
 router.patch("/commission", requireAuth, requireAdmin, async (req, res) => {
   try {
