@@ -12,6 +12,7 @@ const ordersRoutes = require("./routes/orders");
 const uploadsRoutes = require("./routes/uploads");
 const usersRoutes = require("./routes/users");
 const wishlistRoutes = require("./routes/wishlist");
+const reviewsRoutes = require("./routes/reviews");
 const { hydrateCommissionRate } = require("./config/commission");
 
 const app = express();
@@ -38,6 +39,7 @@ app.use("/api/orders", ordersRoutes);
 app.use("/api/uploads", uploadsRoutes);
 app.use("/api/users", usersRoutes);
 app.use("/api/wishlist", wishlistRoutes);
+app.use("/api/reviews", reviewsRoutes);
 
 const start = async () => {
   try {

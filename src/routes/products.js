@@ -5,6 +5,7 @@ const requireActiveUser = require("../middleware/requireActiveUser");
 const { getCommissionRate } = require("../config/commission");
 const Product = require("../models/Product");
 const Notification = require("../models/Notification");
+const Review = require("../models/Review");
 
 const router = express.Router();
 
@@ -112,7 +113,7 @@ router.get("/", async (req, res) => {
       limit
     } = req.query;
 
-    const query = { status: "approved", quantity: { $gt: 0 } };
+    const query = { status: { $in: ["approved", "sold"] } };
     const currentPage = Math.max(Number.parseInt(page, 10) || 1, 1);
     const pageSize = Math.min(
       Math.max(Number.parseInt(limit, 10) || 9, 1),
@@ -172,9 +173,34 @@ router.get("/", async (req, res) => {
       .skip((currentPage - 1) * pageSize)
       .limit(pageSize)
       .lean();
+    const productIds = products.map((product) => product._id);
+    let ratingMap = new Map();
+    if (productIds.length) {
+      const ratings = await Review.aggregate([
+        { $match: { product: { $in: productIds } } },
+        {
+          $group: {
+            _id: "$product",
+            avgRating: { $avg: "$rating" },
+            count: { $sum: 1 }
+          }
+        }
+      ]);
+      ratingMap = new Map(
+        ratings.map((item) => [item._id.toString(), item])
+      );
+    }
+    const productsWithRatings = products.map((product) => {
+      const rating = ratingMap.get(product._id.toString());
+      return {
+        ...product,
+        ratingAverage: rating?.avgRating || 0,
+        ratingCount: rating?.count || 0
+      };
+    });
     return res.json({
-      products,
-      count: products.length,
+      products: productsWithRatings,
+      count: productsWithRatings.length,
       total,
       page: currentPage,
       pageSize
@@ -231,8 +257,7 @@ router.get("/:id", async (req, res) => {
   try {
     const product = await Product.findOne({
       _id: req.params.id,
-      status: "approved",
-      quantity: { $gt: 0 }
+      status: { $in: ["approved", "sold"] }
     })
       .populate("seller", "firstName lastName email phone")
       .lean();
@@ -241,8 +266,25 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ error: "Product not found" });
     }
 
+    const [ratingSummary] = await Review.aggregate([
+      { $match: { product: product._id } },
+      {
+        $group: {
+          _id: "$product",
+          avgRating: { $avg: "$rating" },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
     const commissionRate = getCommissionRate();
-    return res.json({ product, commissionRate });
+    return res.json({
+      product: {
+        ...product,
+        ratingAverage: ratingSummary?.avgRating || 0,
+        ratingCount: ratingSummary?.count || 0
+      },
+      commissionRate
+    });
   } catch (error) {
     console.error("Load product failed", error);
     return res.status(500).json({ error: "Failed to load product" });
