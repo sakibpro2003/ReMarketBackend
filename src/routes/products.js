@@ -106,6 +106,7 @@ router.get("/", async (req, res) => {
       search,
       category,
       condition,
+      location,
       minPrice,
       maxPrice,
       sort,
@@ -126,6 +127,11 @@ router.get("/", async (req, res) => {
 
     if (condition && condition !== "all") {
       query.condition = condition;
+    }
+
+    if (location && location.trim().length) {
+      const escaped = location.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      query.location = new RegExp(escaped, "i");
     }
 
     const priceFilter = {};
