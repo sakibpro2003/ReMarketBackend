@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const { z } = require("zod");
 const requireAuth = require("../middleware/requireAuth");
 const requireActiveUser = require("../middleware/requireActiveUser");
@@ -146,6 +147,159 @@ router.post("/", requireAuth, requireActiveUser, async (req, res) => {
   } catch (error) {
     console.error("Create order failed", error);
     return res.status(500).json({ error: "Failed to place order" });
+  }
+});
+
+router.get("/history", requireAuth, async (req, res) => {
+  try {
+    const page = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(
+      Math.max(Number.parseInt(req.query.limit, 10) || 8, 1),
+      50
+    );
+    const buyerId = new mongoose.Types.ObjectId(req.userId);
+
+    const summaryData = await Order.aggregate([
+      { $match: { buyer: buyerId } },
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          totalItems: { $sum: "$quantity" },
+          totalSpent: { $sum: "$totalAmount" }
+        }
+      }
+    ]);
+
+    const summary = summaryData[0] || {
+      totalOrders: 0,
+      totalItems: 0,
+      totalSpent: 0
+    };
+
+    const total = await Order.countDocuments({ buyer: req.userId });
+    const orders = await Order.find({ buyer: req.userId })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate("product", "title price images status")
+      .populate("seller", "firstName lastName email phone")
+      .lean();
+
+    return res.json({
+      summary,
+      total,
+      page,
+      pageSize: limit,
+      orders: orders.map((order) => ({
+        id: order._id.toString(),
+        quantity: order.quantity,
+        price: order.price,
+        commissionAmount: order.commissionAmount,
+        totalAmount: order.totalAmount,
+        createdAt: order.createdAt,
+        product: order.product
+          ? {
+              id: order.product._id.toString(),
+              title: order.product.title,
+              price: order.product.price,
+              images: order.product.images || []
+            }
+          : null,
+        seller: order.seller
+          ? {
+              id: order.seller._id.toString(),
+              name: `${order.seller.firstName || ""} ${order.seller.lastName || ""}`.trim(),
+              email: order.seller.email,
+              phone: order.seller.phone
+            }
+          : null,
+        delivery: {
+          name: order.delivery?.name,
+          address: order.delivery?.address,
+          city: order.delivery?.city
+        }
+      }))
+    });
+  } catch (error) {
+    console.error("Load buyer order history failed", error);
+    return res.status(500).json({ error: "Failed to load order history" });
+  }
+});
+
+router.get("/sales-history", requireAuth, async (req, res) => {
+  try {
+    const page = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
+    const limit = Math.min(
+      Math.max(Number.parseInt(req.query.limit, 10) || 8, 1),
+      50
+    );
+    const sellerId = new mongoose.Types.ObjectId(req.userId);
+
+    const summaryData = await Order.aggregate([
+      { $match: { seller: sellerId } },
+      {
+        $group: {
+          _id: null,
+          totalOrders: { $sum: 1 },
+          totalItems: { $sum: "$quantity" },
+          totalSales: { $sum: "$price" },
+          totalCommission: { $sum: "$commissionAmount" },
+          totalGross: { $sum: "$totalAmount" }
+        }
+      }
+    ]);
+
+    const summary = summaryData[0] || {
+      totalOrders: 0,
+      totalItems: 0,
+      totalSales: 0,
+      totalCommission: 0,
+      totalGross: 0
+    };
+
+    const total = await Order.countDocuments({ seller: req.userId });
+    const orders = await Order.find({ seller: req.userId })
+      .sort({ createdAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .populate("product", "title price images status")
+      .lean();
+
+    return res.json({
+      summary,
+      total,
+      page,
+      pageSize: limit,
+      orders: orders.map((order) => ({
+        id: order._id.toString(),
+        quantity: order.quantity,
+        price: order.price,
+        commissionAmount: order.commissionAmount,
+        totalAmount: order.totalAmount,
+        createdAt: order.createdAt,
+        product: order.product
+          ? {
+              id: order.product._id.toString(),
+              title: order.product.title,
+              price: order.product.price,
+              images: order.product.images || []
+            }
+          : null,
+        buyer: {
+          name: order.delivery?.name,
+          email: order.delivery?.email,
+          phone: order.delivery?.phone
+        },
+        delivery: {
+          address: order.delivery?.address,
+          city: order.delivery?.city
+        }
+      }))
+    });
+  } catch (error) {
+    console.error("Load seller sales history failed", error);
+    return res.status(500).json({ error: "Failed to load sales history" });
   }
 });
 

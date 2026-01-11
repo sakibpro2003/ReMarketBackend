@@ -8,6 +8,7 @@ const Order = require("../models/Order");
 const Product = require("../models/Product");
 const User = require("../models/User");
 const Complaint = require("../models/Complaint");
+const Blog = require("../models/Blog");
 const CommissionHistory = require("../models/CommissionHistory");
 const {
   getCommissionRate,
@@ -103,6 +104,25 @@ router.get("/notifications", requireAuth, requireAdmin, async (req, res) => {
   } catch (error) {
     console.error("Load notifications failed", error);
     return res.status(500).json({ error: "Failed to load notifications" });
+  }
+});
+
+router.get("/queue-counts", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const [pendingListings, pendingBlogs, openComplaints] = await Promise.all([
+      Product.countDocuments({ status: "pending" }),
+      Blog.countDocuments({ status: "pending" }),
+      Complaint.countDocuments({ status: "open" })
+    ]);
+
+    return res.json({
+      pendingListings,
+      pendingBlogs,
+      openComplaints
+    });
+  } catch (error) {
+    console.error("Load queue counts failed", error);
+    return res.status(500).json({ error: "Failed to load queue counts" });
   }
 });
 
@@ -446,7 +466,8 @@ router.patch("/users/:id/unblock", requireAuth, requireAdmin, async (req, res) =
 
 router.get("/listings", requireAuth, requireAdmin, async (req, res) => {
   try {
-    const status = req.query.status;
+    const rawStatus = typeof req.query.status === "string" ? req.query.status : "";
+    const status = rawStatus.trim().toLowerCase();
     const page = Math.max(Number.parseInt(req.query.page, 10) || 1, 1);
     const limit = Math.min(
       Math.max(Number.parseInt(req.query.limit, 10) || 8, 1),
@@ -454,7 +475,11 @@ router.get("/listings", requireAuth, requireAdmin, async (req, res) => {
     );
     const filter = {};
     if (status && status !== "all") {
-      filter.status = status;
+      if (status === "public" || status === "live") {
+        filter.status = { $in: ["approved", "sold"] };
+      } else {
+        filter.status = status;
+      }
     }
 
     const total = await Product.countDocuments(filter);

@@ -101,6 +101,17 @@ router.get("/notifications", requireAuth, async (req, res) => {
   }
 });
 
+router.patch("/notifications/read", requireAuth, async (req, res) => {
+  try {
+    const filter = { seller: req.userId, type: "order_placed", isRead: false };
+    await Notification.updateMany(filter, { $set: { isRead: true } });
+    return res.json({ unreadCount: 0 });
+  } catch (error) {
+    console.error("Mark seller notifications read failed", error);
+    return res.status(500).json({ error: "Failed to mark notifications read" });
+  }
+});
+
 router.get("/transactions", requireAuth, async (req, res) => {
   try {
     const sellerId = new mongoose.Types.ObjectId(req.userId);
