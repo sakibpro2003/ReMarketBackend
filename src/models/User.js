@@ -5,7 +5,15 @@ const userSchema = new mongoose.Schema(
     firstName: { type: String, required: true, trim: true },
     lastName: { type: String, required: true, trim: true },
     email: { type: String, required: true, lowercase: true, unique: true },
-    phone: { type: String, required: true, trim: true },
+    phone: {
+      type: String,
+      required: true,
+      trim: true,
+      match: [
+        /^(?:\+?88)?01[3-9]\d{8}$/,
+        "Phone number is not valid"
+      ]
+    },
     gender: { type: String, required: true, trim: true },
     address: { type: String, required: true, trim: true },
     avatarUrl: { type: String, trim: true },

@@ -56,6 +56,18 @@ const freezeSchema = z
   })
   .strict();
 
+const phoneUpdateSchema = z
+  .object({
+    phone: z
+      .string()
+      .trim()
+      .regex(
+        /^\+8801[3-9]\d{8}$/,
+        "Phone number must be a valid Bangladeshi mobile number"
+      )
+  })
+  .strict();
+
 const assignSellerSchema = z
   .object({
     sellerId: z.string().trim().min(1)
@@ -350,6 +362,28 @@ router.get("/users", requireAuth, requireAdmin, async (req, res) => {
   } catch (error) {
     console.error("Load users failed", error);
     return res.status(500).json({ error: "Failed to load users" });
+  }
+});
+
+router.patch("/users/:id/phone", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const parsed = phoneUpdateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: firstZodError(parsed.error) });
+    }
+
+    const user = await User.findById(req.params.id).select("-passwordHash");
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    user.phone = parsed.data.phone;
+    await user.save();
+
+    return res.json({ user });
+  } catch (error) {
+    console.error("Update user phone failed", error);
+    return res.status(500).json({ error: "Failed to update phone number" });
   }
 });
 

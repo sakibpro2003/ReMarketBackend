@@ -2,6 +2,9 @@ const express = require("express");
 const requireAuth = require("../middleware/requireAuth");
 const requireAdmin = require("../middleware/requireAdmin");
 const Blog = require("../models/Blog");
+const BlogComment = require("../models/BlogComment");
+const BlogFeedback = require("../models/BlogFeedback");
+const Notification = require("../models/Notification");
 
 const router = express.Router();
 
@@ -42,7 +45,7 @@ router.patch("/:id/approve", requireAuth, requireAdmin, async (req, res) => {
   try {
     const blog = await Blog.findByIdAndUpdate(
       req.params.id,
-      { status: "approved" },
+      { status: "approved", isHidden: false },
       { new: true }
     )
       .populate("author", "firstName lastName email")
@@ -63,7 +66,7 @@ router.patch("/:id/reject", requireAuth, requireAdmin, async (req, res) => {
   try {
     const blog = await Blog.findByIdAndUpdate(
       req.params.id,
-      { status: "rejected" },
+      { status: "rejected", isHidden: false },
       { new: true }
     )
       .populate("author", "firstName lastName email")
@@ -77,6 +80,68 @@ router.patch("/:id/reject", requireAuth, requireAdmin, async (req, res) => {
   } catch (error) {
     console.error("Reject blog failed", error);
     return res.status(500).json({ error: "Failed to reject blog" });
+  }
+});
+
+router.patch("/:id/hide", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const blog = await Blog.findByIdAndUpdate(
+      req.params.id,
+      { isHidden: true },
+      { new: true }
+    )
+      .populate("author", "firstName lastName email")
+      .lean();
+
+    if (!blog) {
+      return res.status(404).json({ error: "Blog not found" });
+    }
+
+    return res.json({ blog });
+  } catch (error) {
+    console.error("Hide blog failed", error);
+    return res.status(500).json({ error: "Failed to hide blog" });
+  }
+});
+
+router.patch("/:id/unhide", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const blog = await Blog.findByIdAndUpdate(
+      req.params.id,
+      { isHidden: false },
+      { new: true }
+    )
+      .populate("author", "firstName lastName email")
+      .lean();
+
+    if (!blog) {
+      return res.status(404).json({ error: "Blog not found" });
+    }
+
+    return res.json({ blog });
+  } catch (error) {
+    console.error("Unhide blog failed", error);
+    return res.status(500).json({ error: "Failed to unhide blog" });
+  }
+});
+
+router.delete("/:id", requireAuth, requireAdmin, async (req, res) => {
+  try {
+    const blog = await Blog.findByIdAndDelete(req.params.id).lean();
+    if (!blog) {
+      return res.status(404).json({ error: "Blog not found" });
+    }
+
+    await Promise.all([
+      BlogComment.deleteMany({ blog: blog._id }),
+      BlogFeedback.deleteMany({ blog: blog._id }),
+      Notification.deleteMany({ blog: blog._id })
+    ]);
+
+    return res.json({ id: blog._id.toString() });
+  } catch (error) {
+    console.error("Delete blog failed", error);
+    return res.status(500).json({ error: "Failed to delete blog" });
   }
 });
 

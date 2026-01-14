@@ -102,7 +102,7 @@ router.post("/", requireAuth, requireActiveUser, async (req, res) => {
 router.get("/", async (req, res) => {
   try {
     const { search, page, limit } = req.query;
-    const filter = { status: "approved" };
+    const filter = { status: "approved", isHidden: false };
     const currentPage = Math.max(Number.parseInt(page, 10) || 1, 1);
     const pageSize = Math.min(
       Math.max(Number.parseInt(limit, 10) || 6, 1),
@@ -221,7 +221,11 @@ router.get("/:id", async (req, res) => {
       return res.status(400).json({ error: "Invalid blog id" });
     }
 
-    const blog = await Blog.findOne({ _id: id, status: "approved" })
+    const blog = await Blog.findOne({
+      _id: id,
+      status: "approved",
+      isHidden: false
+    })
       .populate("author", "firstName lastName avatarUrl")
       .lean();
     if (!blog) {
@@ -267,9 +271,11 @@ router.get("/:id/comments", async (req, res) => {
       return res.status(400).json({ error: "Invalid blog id" });
     }
 
-    const blog = await Blog.findOne({ _id: id, status: "approved" }).select(
-      "_id"
-    );
+    const blog = await Blog.findOne({
+      _id: id,
+      status: "approved",
+      isHidden: false
+    }).select("_id");
     if (!blog) {
       return res.status(404).json({ error: "Blog not found" });
     }
@@ -312,9 +318,11 @@ router.post("/:id/comments", requireAuth, requireActiveUser, async (req, res) =>
       return res.status(400).json({ error: firstZodError(parsed.error) });
     }
 
-    const blog = await Blog.findOne({ _id: id, status: "approved" }).select(
-      "_id"
-    );
+    const blog = await Blog.findOne({
+      _id: id,
+      status: "approved",
+      isHidden: false
+    }).select("_id");
     if (!blog) {
       return res.status(404).json({ error: "Blog not found" });
     }
@@ -353,6 +361,15 @@ router.get("/:id/feedback/me", requireAuth, async (req, res) => {
       return res.status(400).json({ error: "Invalid blog id" });
     }
 
+    const blog = await Blog.findOne({
+      _id: id,
+      status: "approved",
+      isHidden: false
+    }).select("_id");
+    if (!blog) {
+      return res.status(404).json({ error: "Blog not found" });
+    }
+
     const feedback = await BlogFeedback.findOne({
       blog: id,
       user: req.userId
@@ -377,9 +394,11 @@ router.post("/:id/feedback", requireAuth, requireActiveUser, async (req, res) =>
       return res.status(400).json({ error: firstZodError(parsed.error) });
     }
 
-    const blog = await Blog.findOne({ _id: id, status: "approved" }).select(
-      "_id"
-    );
+    const blog = await Blog.findOne({
+      _id: id,
+      status: "approved",
+      isHidden: false
+    }).select("_id");
     if (!blog) {
       return res.status(404).json({ error: "Blog not found" });
     }

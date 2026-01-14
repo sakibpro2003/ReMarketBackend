@@ -14,6 +14,7 @@ const blogSchema = new mongoose.Schema(
     description: { type: String, required: true, trim: true },
     tags: { type: [String], default: [] },
     images: { type: [imageSchema], default: [] },
+    isHidden: { type: Boolean, default: false },
     status: {
       type: String,
       enum: ["draft", "pending", "approved", "rejected"],
@@ -24,5 +25,6 @@ const blogSchema = new mongoose.Schema(
 );
 
 blogSchema.index({ status: 1, createdAt: -1 });
+blogSchema.index({ status: 1, isHidden: 1, createdAt: -1 });
 
 module.exports = mongoose.model("Blog", blogSchema);
